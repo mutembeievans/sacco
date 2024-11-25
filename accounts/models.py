@@ -5,9 +5,10 @@ from django.contrib.auth.models import AbstractUser
 # Create your models here.
 class CustomUser(AbstractUser):
     email = models.EmailField(unique=True)
+    username = models.CharField(max_length=150, unique=True)
     id_number = models.CharField(max_length=50, unique=True)
     member_no = models.CharField(max_length=100, unique=True)
-
+    profile = models.ImageField(upload_to='profiles/', default='default.jpg')
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'id_number', 'member_no']
 
@@ -22,7 +23,7 @@ class MemberDependent(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     name = models.CharField(default='', max_length=100)
     relationship = models.CharField(default='', max_length=100)
-    proof = models.ImageField(upload_to='dependents/', default='')
+    proof = models.FileField(upload_to='dependents/', default='')
     verified = models.BooleanField(default=False)
 
     class Meta:
@@ -39,7 +40,6 @@ class MemberProfile(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     mobile_no = models.IntegerField(default=0)
     residence = models.CharField(default='', max_length=50)
-    profile_picture = models.ImageField(upload_to='profiles/', default='')
 
     class Meta:
         '''Meta definition for MemberProfile.'''

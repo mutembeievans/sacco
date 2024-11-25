@@ -4,7 +4,7 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from .models import CustomUser, MemberProfile, MemberDependent, Contributions, OverallContribution
 from .modules import generate_unique_membership_number, verify_dependant
-from .forms import MemberProfileForm
+from .forms import MemberProfileForm, DependantForm
 from django.contrib.auth.decorators import user_passes_test
 
 
@@ -13,28 +13,20 @@ def admin_check(user):
 
 # Create your views here.
 def chart_data(request):
-    contributions = OverallContribution.objects.latest('id')
-    data = {
-            'funeral_kitty': contributions.funeral_kitty,
-            'monthly_contributions':contributions.monthly_contributions,
-            'expenditure': contributions.expenditure,
-            'savings': contributions.savings,
-    }
-    return JsonResponse(data)
+    return JsonResponse("Hi")
 
 def index(request):
     if request.user.is_superuser:
         members = CustomUser.objects.all()
-        contributions = OverallContribution.objects.latest('id')
 
         context = {
             "members": members,
-            'funeral_kitty': contributions.funeral_kitty,
-            'monthly_contributions':contributions.monthly_contributions,
-            'expenditure': contributions.expenditure,
-            'savings': contributions.savings,
+            # 'funeral_kitty': contributions.funeral_kitty,
+            # 'monthly_contributions':contributions.monthly_contributions,
+            # 'expenditure': contributions.expenditure,
+            # 'savings': contributions.savings,
         }
-        chart = chart_data(request)
+        # chart = chart_data(request)
     else:
         user = request.user.id
         contributions = Contributions.objects.filter(user=user)
@@ -60,7 +52,7 @@ def login_(request):
             # Invalid login error
             return JsonResponse({'error': 'Invalid credentials'})
             # return render(request, 'login.html', {'error': 'Invalid credentials'})
-
+    return render(request, 'login.html')
 def register_(request):
     if request.method == 'POST':
         username = request.POST['fullname']
@@ -70,10 +62,17 @@ def register_(request):
         password2 = request.POST['password2']
         membership_no = generate_unique_membership_number()
 
+        member = True if CustomUser.objects.filter(username=username).exists() else False
+        if member:
+            message.error(request, "Username Already Taken")
+            return redirect("register")
+
         if password2 != password1:
             # messages.error(request, 'Passwords do not match')
             print('Passwords do not match')
             messages.error(request, 'Passwords do not match')
+            return redirect("register")
+
         else:
             user = CustomUser.objects.create_user(
                             username=username,
@@ -107,12 +106,15 @@ def update_profile(request):
 
     else:
         form = MemberProfileForm(instance=user_profile)
-        dependents = MemberDependent.objects.filter(user=user_profile.user)
+        dependant_form = DependantForm(instance=user_profile)
+        dependents = MemberDependent.objects.filter(user=user_profile.id)
         context = {
                 'dependents': dependents,
-                'form': form
-            }
-    return render(request, 'update.html')
+                'form': form,
+                'dependantform': dependant_form
+        }
+    return render(request, 'update.html', context)
+
 
 def add_dependant(request):
     user = get_object_or_404(CustomUser, id=request.user.id)
@@ -125,9 +127,19 @@ def add_dependant(request):
         messages.success(request, 'Dependent Added Successfully')
         return redirect('update')
 
+def edit_dependant(request, pk):
+    dependant_profile = MemberDependent.objects.get(id=pk)
+
+    if request.method == 'POST':
+        form = DependantForm(request.POST, request.FILES, instance=dependant_profile)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Profile Dependant')
+            return redirect('update')  # Redirect to same profile page
+
+
 @user_passes_test(admin_check)
 def member_view(request, name):
-
     name = name.replace('-', ' ')
     username = get_object_or_404(CustomUser, username__iexact=name)
     member = CustomUser.objects.filter(username=username)
@@ -142,6 +154,12 @@ def member_view(request, name):
 
     return render(request, 'member_details.html', context)
 
+def members(request):
+    members = CustomUser.objects.all().order_by('-is_superuser', '-is_staff', 'username')
+    context = {
+        'members': members
+    }
+    return render(request, 'members.html', context)
 
 
 def logout_(request):
